@@ -1,5 +1,10 @@
+#ifdef _MSC_VER
+#pragma warning(disable : 4786)
+#endif
+
 #include <memory>
 #include <string>
+#include <vector>
 #include <stdio.h>
 #include <stdlib.h>
 #include <corona.h>
@@ -13,22 +18,13 @@
 #define TIMER_ID 900
 
 
-struct StringNode
-{
-    std::string str;
-    StringNode* next;
-};
-
 typedef unsigned char byte;
 
 
 enum DM { DM_ORIGINALSIZE, DM_STRETCHED };
 
 
-static bool DestroyImageList();
 static bool CreateImageList(const char* directory);
-static const char* GetImage(int index);
-static void AddImage(const char* image);
 static bool UpdateImage();
 static bool NextImage();
 static bool PrevImage();
@@ -41,9 +37,8 @@ static HBITMAP ImageBitmap;
 static int     ImageWidth;
 static int     ImageHeight;
 
-static StringNode* ImageList;
-static int         ImageListSize;
-static int         CurrentImage = -1;
+static std::vector<std::string> ImageList;
+static int                      CurrentImage = -1;
 
 
 static int Timer = 5000;
@@ -57,293 +52,290 @@ static bool RecurseSubdirectories;
 
 LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
-    switch (message) {
+  switch (message) {
 
-        case WM_CREATE: {
-            ImageDC = CreateCompatibleDC(NULL);
+      case WM_CREATE: {
+          ImageDC = CreateCompatibleDC(NULL);
+          
+          SetTimer(window, TIMER_ID, Timer, NULL);
+          return 0;
+      }
 
-            SetTimer(window, TIMER_ID, 15, NULL);
-            return 0;
-        }
+      ////////////////////////////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////////////////////////
+      case WM_DESTROY: {
+          KillTimer(window, TIMER_ID);
+          DeleteDC(ImageDC);
+          ImageList.clear();
+          PostQuitMessage(0);
+          return 0;
+      }
 
-        case WM_DESTROY: {
-            KillTimer(window, TIMER_ID);
-            DeleteDC(ImageDC);
-            DestroyImageList();
-            PostQuitMessage(0);
-            return 0;
-        }
+      ////////////////////////////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////////////////////////
+      case WM_RBUTTONUP: {
+          HMENU menu = LoadMenu(GetModuleHandle(0), MAKEINTRESOURCE(IDR_MAIN));
+          HMENU sub_menu = GetSubMenu(menu, 0);
 
-        case WM_RBUTTONUP: {
-            HMENU menu = LoadMenu(GetModuleHandle(0), MAKEINTRESOURCE(IDR_MAIN));
-            HMENU sub_menu = GetSubMenu(menu, 0);
+          // update the menu
+          switch (Timer) {
+              case 0:     CheckMenuItem(menu, ID_MAIN_DELAY_NONE,  BST_CHECKED); break;
+              case 1000:  CheckMenuItem(menu, ID_MAIN_DELAY_1S,    BST_CHECKED); break;
+              case 2000:  CheckMenuItem(menu, ID_MAIN_DELAY_2S,    BST_CHECKED); break;
+              case 5000:  CheckMenuItem(menu, ID_MAIN_DELAY_5S,    BST_CHECKED); break;
+              case 10000: CheckMenuItem(menu, ID_MAIN_DELAY_10S,   BST_CHECKED); break;
+              default:    CheckMenuItem(menu, ID_MAIN_DELAY_OTHER, BST_CHECKED); break;
+          }
 
-            // update the menu
-            switch (Timer) {
-                case 0:     CheckMenuItem(menu, ID_MAIN_DELAY_NONE,  BST_CHECKED); break;
-                case 1000:  CheckMenuItem(menu, ID_MAIN_DELAY_1S,    BST_CHECKED); break;
-                case 2000:  CheckMenuItem(menu, ID_MAIN_DELAY_2S,    BST_CHECKED); break;
-                case 5000:  CheckMenuItem(menu, ID_MAIN_DELAY_5S,    BST_CHECKED); break;
-                case 10000: CheckMenuItem(menu, ID_MAIN_DELAY_10S,   BST_CHECKED); break;
-                default:    CheckMenuItem(menu, ID_MAIN_DELAY_OTHER, BST_CHECKED); break;
-            }
+          if (DisplayMode == DM_ORIGINALSIZE) {
+              CheckMenuItem(menu, ID_MAIN_DISPLAY_ORIGINALSIZE, BST_CHECKED);
+          } else {
+              CheckMenuItem(menu, ID_MAIN_DISPLAY_STRETCHED, BST_CHECKED);
+          }
 
-            if (DisplayMode == DM_ORIGINALSIZE) {
-                CheckMenuItem(menu, ID_MAIN_DISPLAY_ORIGINALSIZE, BST_CHECKED);
-            } else {
-                CheckMenuItem(menu, ID_MAIN_DISPLAY_STRETCHED, BST_CHECKED);
-            }
+          if (Random) {
+              CheckMenuItem(menu, ID_MAIN_OPTIONS_RANDOM, BST_CHECKED);
+          }
 
-            if (Random) {
-                CheckMenuItem(menu, ID_MAIN_OPTIONS_RANDOM, BST_CHECKED);
-            }
+          if (RecurseSubdirectories) {
+              CheckMenuItem(menu, ID_MAIN_OPTIONS_RECURSESUBDIRECTORIES, BST_CHECKED);
+          }
 
-            if (RecurseSubdirectories) {
-                CheckMenuItem(menu, ID_MAIN_OPTIONS_RECURSESUBDIRECTORIES, BST_CHECKED);
-            }
+          POINT cursor;
+          GetCursorPos(&cursor);
+          TrackPopupMenuEx(sub_menu, TPM_LEFTALIGN | TPM_TOPALIGN, cursor.x, cursor.y, window, NULL);
+          return 0;
+      }
 
-            POINT cursor;
-            GetCursorPos(&cursor);
-            TrackPopupMenuEx(sub_menu, TPM_LEFTALIGN | TPM_TOPALIGN, cursor.x, cursor.y, window, NULL);
-            return 0;
-        }
+      ////////////////////////////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////////////////////////
+      case WM_LBUTTONDOWN: {
 
-        case WM_LBUTTONDOWN: {
+          if (wparam & MK_SHIFT) {
+              PrevImage();
+          } else {
+              NextImage();
+          }
+          InvalidateRect(window, NULL, TRUE);
 
-            if (wparam & MK_SHIFT) {
-                PrevImage();
-            } else {
-                NextImage();
-            }
-            InvalidateRect(window, NULL, TRUE);
+          ResetTimer(window);
+          return 0;
+      }
 
-            ResetTimer(window);
-            return 0;
-        }
+      ////////////////////////////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////////////////////////
+      case WM_COMMAND: {
+          switch (LOWORD(wparam)) {
 
-        case WM_COMMAND: {
-            switch (LOWORD(wparam)) {
+              case ID_MAIN_SETDIRECTORY: {
+                  char image_folder[MAX_PATH];
+                  if (BrowseForFolderDialog(window, "Choose Image Directory", image_folder)) {
+                      // now that we have the directory, update the image list
+                      CurrentImage = -1;
+                      ImageList.clear();
+                      CreateImageList(image_folder);
+                      UpdateImage();
 
-                case ID_MAIN_SETDIRECTORY: {
-                    char image_folder[MAX_PATH];
-                    if (BrowseForFolderDialog(window, "Choose Image Directory", image_folder)) {
-                        // now that we have the directory, update the image list
-                        CurrentImage = -1;
-                        DestroyImageList();
-                        CreateImageList(image_folder);
-                        UpdateImage();
+                      InvalidateRect(window, NULL, TRUE);
+                      ResetTimer(window);
+                  }
+                  return 0;
+              }
 
-                        InvalidateRect(window, NULL, TRUE);
-                        ResetTimer(window);
-                    }
-                    return 0;
-                }
+              case ID_MAIN_DELAY_NONE: {
+                  Timer = 0;
+                  ResetTimer(window);
+                  return 0;
+              }
 
-                case ID_MAIN_DELAY_NONE: {
-                    Timer = 0;
-                    ResetTimer(window);
-                    return 0;
-                }
+              case ID_MAIN_DELAY_1S: {
+                  Timer = 1000;
+                  ResetTimer(window);
+                  return 0;
+              }
 
-                case ID_MAIN_DELAY_1S: {
-                    Timer = 1000;
-                    ResetTimer(window);
-                    return 0;
-                }
+              case ID_MAIN_DELAY_2S: {
+                  Timer = 2000;
+                  ResetTimer(window);
+                  return 0;
+              }
 
-                case ID_MAIN_DELAY_2S: {
-                    Timer = 2000;
-                    ResetTimer(window);
-                    return 0;
-                }
+              case ID_MAIN_DELAY_5S: {
+                  Timer = 5000;
+                  ResetTimer(window);
+                  return 0;
+              }
 
-                case ID_MAIN_DELAY_5S: {
-                    Timer = 5000;
-                    ResetTimer(window);
-                    return 0;
-                }
+              case ID_MAIN_DELAY_10S: {
+                  Timer = 10000;
+                  ResetTimer(window);
+                  return 0;
+              }
 
-                case ID_MAIN_DELAY_10S: {
-                    Timer = 10000;
-                    ResetTimer(window);
-                    return 0;
-                }
+              case ID_MAIN_DELAY_OTHER: {
+                  int timer = GetDelayDialog(window);
+                  if (timer != -1)
+                      Timer = timer;
+                  ResetTimer(window);
+                  return 0;
+              }
 
-                case ID_MAIN_DELAY_OTHER: {
-                    int timer = GetDelayDialog(window);
-                    if (timer != -1)
-                        Timer = timer;
-                    ResetTimer(window);
-                    return 0;
-                }
+              case ID_MAIN_DISPLAY_ORIGINALSIZE: {
+                  DisplayMode = DM_ORIGINALSIZE;
+                  InvalidateRect(window, NULL, TRUE);
+                  return 0;
+              }
 
-                case ID_MAIN_DISPLAY_ORIGINALSIZE: {
-                    DisplayMode = DM_ORIGINALSIZE;
-                    InvalidateRect(window, NULL, TRUE);
-                    return 0;
-                }
+              case ID_MAIN_DISPLAY_STRETCHED: {
+                  DisplayMode = DM_STRETCHED;
+                  InvalidateRect(window, NULL, TRUE);
+                  return 0;
+              }
 
-                case ID_MAIN_DISPLAY_STRETCHED: {
-                    DisplayMode = DM_STRETCHED;
-                    InvalidateRect(window, NULL, TRUE);
-                    return 0;
-                }
+              case ID_MAIN_OPTIONS_RANDOM: {
+                  Random = !Random;
+                  return 0;
+              }
 
-                case ID_MAIN_OPTIONS_RANDOM: {
-                    Random = !Random;
-                    return 0;
-                }
+              case ID_MAIN_OPTIONS_RECURSESUBDIRECTORIES: {
+                  RecurseSubdirectories = !RecurseSubdirectories;
+                  return 0;
+              }
 
-                case ID_MAIN_OPTIONS_RECURSESUBDIRECTORIES: {
-                    RecurseSubdirectories = !RecurseSubdirectories;
-                    return 0;
-                }
+              case ID_MAIN_ABOUT: {
+                  MessageBox(window, "(c) Chad Austin 2002\n"
+                                     __DATE__, "PictureShow", MB_OK);
+                  return 0;
+              }
 
-                case ID_MAIN_ABOUT: {
-                    MessageBox(window, "(c) Chad Austin 2000\n"
-                                       __DATE__, "PictureShow", MB_OK);
-                    return 0;
-                }
+              case ID_MAIN_EXIT: {
+                  DestroyWindow(window);
+                  return 0;
+              }
+          }
+          return 0;
+      }
 
-                case ID_MAIN_EXIT: {
-                    DestroyWindow(window);
-                    return 0;
-                }
-            }
-            return 0;
-        }
+      ////////////////////////////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////////////////////////
+      case WM_TIMER: {
+          if (Timer != 0) {
+              NextImage();
+              InvalidateRect(window, NULL, TRUE);
+          }
+          return 0;
+      }
 
-        case WM_TIMER: {
-            if (Timer != 0) {
-                NextImage();
-                InvalidateRect(window, NULL, TRUE);
-            }
-            return 0;
-        }
+      ////////////////////////////////////////////////////////////////////////
 
-        ////////////////////////////////////////////////////////////////////////
+      case WM_PAINT: {
+          PAINTSTRUCT ps;
+          BeginPaint(window, &ps);
 
-        case WM_PAINT: {
-            PAINTSTRUCT ps;
-            BeginPaint(window, &ps);
+          // draw the image
+          if (ImageWidth != 0 && ImageHeight != 0) {
 
-            // draw the image
-            if (ImageWidth != 0 && ImageHeight != 0) {
+              int screen_width  = GetSystemMetrics(SM_CXSCREEN);
+              int screen_height = GetSystemMetrics(SM_CYSCREEN);
 
-                int screen_width  = GetSystemMetrics(SM_CXSCREEN);
-                int screen_height = GetSystemMetrics(SM_CYSCREEN);
+              bool stretched_view = DisplayMode == DM_STRETCHED;
 
-                bool stretched_view = DisplayMode == DM_STRETCHED;
+              if (DisplayMode == DM_ORIGINALSIZE) {   // original size view
 
-                if (DisplayMode == DM_ORIGINALSIZE) {   // original size view
+                  if (ImageWidth < screen_width &&
+                      ImageHeight < screen_height) {
 
-                    if (ImageWidth < screen_width &&
-                        ImageHeight < screen_height) {
+                      int x = (screen_width  - ImageWidth)  / 2;
+                      int y = (screen_height - ImageHeight) / 2;
 
-                        int x = (screen_width  - ImageWidth)  / 2;
-                        int y = (screen_height - ImageHeight) / 2;
-                        BitBlt(ps.hdc, x, y, ImageWidth, ImageHeight, ImageDC, 0, 0, SRCCOPY);
+                      HBITMAP old = (HBITMAP)SelectObject(ImageDC, ImageBitmap);
+                      BitBlt(ps.hdc, x, y, ImageWidth, ImageHeight, ImageDC, 0, 0, SRCCOPY);
+                      SelectObject(ImageDC, old);
 
-                    } else {  // do the stretched view if the image is bigger than the screen
-                        stretched_view = true;
-                    }
+                  } else {  // do the stretched view if the image is bigger than the screen
+                      stretched_view = true;
+                  }
 
-                }
+              }
 
-                // stretched view
-                if (stretched_view) {
+              // stretched view
+              if (stretched_view) {
 
-                    float screen_aspect_ratio = (float)screen_width / screen_height;
+                  float screen_aspect_ratio = (float)screen_width / screen_height;
 
-                    // calculate destination rectangle
-                    float image_aspect_ratio = (float)ImageWidth / ImageHeight;
+                  // calculate destination rectangle
+                  float image_aspect_ratio = (float)ImageWidth / ImageHeight;
 
-                    int dest_x = 0;
-                    int dest_y = 0;
-                    int dest_w;
-                    int dest_h;
+                  int dest_x = 0;
+                  int dest_y = 0;
+                  int dest_w;
+                  int dest_h;
 
-                    // we're going to fill the width, but not the height
-                    if (image_aspect_ratio > screen_aspect_ratio) {
-                        dest_w = screen_width;
-                        dest_h = (int)(screen_height * screen_aspect_ratio / image_aspect_ratio);
-                    } else {
-                        dest_w = (int)(screen_width * image_aspect_ratio / screen_aspect_ratio);
-                        dest_h = screen_height;
-                    }
-                    dest_x = (screen_width  - dest_w) / 2;
-                    dest_y = (screen_height - dest_h) / 2;
-            
-                    StretchBlt(ps.hdc, dest_x, dest_y, dest_w, dest_h, ImageDC, 0, 0, ImageWidth, ImageHeight, SRCCOPY);
-                }
-            }
+                  // we're going to fill the width, but not the height
+                  if (image_aspect_ratio > screen_aspect_ratio) {
+                      dest_w = screen_width;
+                      dest_h = (int)(screen_height * screen_aspect_ratio / image_aspect_ratio);
+                  } else {
+                      dest_w = (int)(screen_width * image_aspect_ratio / screen_aspect_ratio);
+                      dest_h = screen_height;
+                  }
+                  dest_x = (screen_width  - dest_w) / 2;
+                  dest_y = (screen_height - dest_h) / 2;
+          
+                  HBITMAP old = (HBITMAP)SelectObject(ImageDC, ImageBitmap);
+                  StretchBlt(ps.hdc, dest_x, dest_y, dest_w, dest_h, ImageDC, 0, 0, ImageWidth, ImageHeight, SRCCOPY);
+                  (HBITMAP)SelectObject(ImageDC, old);
+              }
+          }
 
-            // draw the image filename
-            char text[MAX_PATH + 80];
-            sprintf(text, "%d/%d", CurrentImage + 1, ImageListSize);
-            if (CurrentImage < ImageListSize && ImageListSize > 0) {
-                strcat(text, " -- ");
-                strcat(text, GetImage(CurrentImage));
-            }
-            DrawShadedText(ps.hdc, 0, 0, text);
+          // draw the image filename
+          char text[MAX_PATH + 80];
+          sprintf(text, "%d/%d", CurrentImage + 1, ImageList.size());
+          if (CurrentImage < ImageList.size() && ImageList.size() > 0) {
+              strcat(text, " -- ");
+              strcat(text, ImageList[CurrentImage].c_str());
+          }
+          DrawShadedText(ps.hdc, 0, 0, text);
 
-            EndPaint(window, &ps);
-            return 0;
-        }
+          EndPaint(window, &ps);
+          return 0;
+      }
 
-        ////////////////////////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////////////////////////
 
-        default: {
-            return DefWindowProc(window, message, wparam, lparam);
-        }
-    }
+      default: {
+          return DefWindowProc(window, message, wparam, lparam);
+      }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 static bool IsJPEG(const char* filename)
 {
-    return ((strlen(filename) > 5 && strcmp_ci(filename + strlen(filename) - 5, ".jpeg") == 0) ||
-            (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".jpg") == 0));
+  return ((strlen(filename) > 5 && strcmp_ci(filename + strlen(filename) - 5, ".jpeg") == 0) ||
+          (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".jpg") == 0));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 static bool IsPNG(const char* filename)
 {
-    return (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".png") == 0);
+  return (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".png") == 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 static bool IsPCX(const char* filename)
 {
-    return (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".pcx") == 0);
+  return (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".pcx") == 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool DestroyImageList()
+static bool IsImage(const char* filename)
 {
-    StringNode* node = ImageList;
-    while (node) {
-        StringNode* p = node;
-        node = node->next;
-        delete p;
-    }
-    ImageList = NULL;
-    ImageListSize = 0;
-    return true;
+  return IsJPEG(filename) || IsPNG(filename) || IsPCX(filename);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -383,12 +375,11 @@ bool CreateImageList(const char* _directory)
         // if the file is a JPEG or PNG, add it to the list
         } else {
             if (strlen(ffd.cFileName) > 4) {
-//                if (IsJPEG(ffd.cFileName) || IsPNG(ffd.cFileName)) {
-                if (IsPCX(ffd.cFileName)) {
+                if (IsImage(ffd.cFileName)) {
 
                     char path[MAX_PATH];
                     sprintf(path, "%s\\%s", directory, ffd.cFileName);
-                    AddImage(path);
+                    ImageList.push_back(path);
                 }
             }
         }
@@ -398,42 +389,6 @@ bool CreateImageList(const char* _directory)
 
     SetCurrentDirectory(old_directory);
     return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-const char* GetImage(int index)
-{
-    if (index < 0) {
-        return NULL;
-    }
-
-    StringNode* node = ImageList;
-    while (index--) {
-        node = node->next;
-    }
-    return node->str.c_str();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-void AddImage(const char* image)
-{
-    StringNode* n = new StringNode;
-    n->str = image;
-    n->next = NULL;
-
-    if (ImageList == NULL) {
-        ImageList = n;
-    } else {
-        StringNode* p = ImageList;
-        while (p->next) {
-            p = p->next;
-        }
-        p->next = n;
-    }
-
-    ImageListSize++;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -448,8 +403,8 @@ bool UpdateImage()
     ImageWidth = 0;
     ImageHeight = 0;
 
-    if (ImageListSize < 1) {
-        return false;
+    if (ImageList.empty()) {
+      return false;
     }
 
     if (CurrentImage < 0) {
@@ -457,7 +412,7 @@ bool UpdateImage()
     }
 
     // load the image
-    const char* filename = GetImage(CurrentImage);
+    const char* filename = ImageList[CurrentImage].c_str();
     corona::Image* image = corona::OpenImage(filename);
     if (!image) {
         return false;
@@ -500,8 +455,6 @@ bool UpdateImage()
       }
     }
 
-    SelectObject(ImageDC, ImageBitmap);
-
     image->destroy();
     return true;
 }
@@ -510,19 +463,19 @@ bool UpdateImage()
 
 bool NextImage()
 {
-    if (ImageListSize < 1) {
+    if (ImageList.size() < 1) {
         CurrentImage = -1;
         return 0;
     }
 
     if (Random) {
 
-        CurrentImage = rand() % ImageListSize;
+        CurrentImage = rand() % ImageList.size();
 
     } else {
 
         CurrentImage++;
-        if (CurrentImage > ImageListSize - 1) {
+        if (CurrentImage > ImageList.size() - 1) {
             CurrentImage = 0;
         }
     }
@@ -534,20 +487,20 @@ bool NextImage()
 
 bool PrevImage()
 {
-    if (ImageListSize < 1) {
+    if (ImageList.size() < 1) {
         CurrentImage = -1;
         return 0;
     }
 
     if (Random) {
 
-        CurrentImage = rand() % ImageListSize;
+        CurrentImage = rand() % ImageList.size();
 
     } else {
 
         CurrentImage--;
         if (CurrentImage < 0) {
-            CurrentImage = ImageListSize - 1;
+            CurrentImage = ImageList.size() - 1;
         }
     }
 
@@ -576,9 +529,9 @@ void ResetTimer(HWND window)
 {
     KillTimer(window, TIMER_ID);
     if (Timer == 0) {
-        SetTimer(window, TIMER_ID, 15, NULL);
+        SetTimer(window, TIMER_ID, 1000, NULL);
     } else {
-        SetTimer(window, TIMER_ID, 15, NULL);
+        SetTimer(window, TIMER_ID, Timer, NULL);
     }
 }
 
