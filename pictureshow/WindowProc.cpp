@@ -124,6 +124,15 @@ LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM
 
       ////////////////////////////////////////////////////////////////////////
 
+      case WM_KEYDOWN: {
+          /// @todo  check the key
+          NextImage();
+          InvalidateRect(window, NULL, TRUE);
+          return 0;
+      }
+
+      ////////////////////////////////////////////////////////////////////////
+
       case WM_COMMAND: {
           switch (LOWORD(wparam)) {
 
@@ -333,9 +342,23 @@ static bool IsPCX(const char* filename)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static bool IsBMP(const char* filename)
+{
+  return (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".bmp") == 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static bool IsGIF(const char* filename)
+{
+  return (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".gif") == 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 static bool IsImage(const char* filename)
 {
-  return IsJPEG(filename) || IsPNG(filename) || IsPCX(filename);
+  return IsJPEG(filename) || IsPNG(filename) || IsPCX(filename) || IsBMP(filename) || IsGIF(filename);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -413,15 +436,18 @@ bool UpdateImage()
 
     // load the image
     const char* filename = ImageList[CurrentImage].c_str();
-    corona::Image* image = corona::OpenImage(filename);
+    corona::Image* image = corona::OpenImage(
+        filename,
+        corona::FF_AUTODETECT,
+        corona::PF_R8G8B8);
     if (!image) {
+        MessageBeep(MB_ICONERROR);
         return false;
     }
 
     // get image dimensions
     ImageWidth   = image->getWidth();
     ImageHeight  = image->getHeight();
-    int ImageBPP = image->getFormat() == corona::R8G8B8 ? 24 : 32;
 
     BITMAPINFO bmi;
     memset(&bmi, 0, sizeof(bmi));
@@ -434,9 +460,10 @@ bool UpdateImage()
     
     // create a new DIB section based on the image
     byte* bits;
-    ImageBitmap = CreateDIBSection(ImageDC, &bmi, DIB_RGB_COLORS, (void**)&bits, NULL, 0);
+    ImageBitmap = CreateDIBSection(
+        ImageDC, &bmi, DIB_RGB_COLORS, (void**)&bits, NULL, 0);
 
-    byte* in = (unsigned char*)image->getPixels();
+    byte* in = (byte*)image->getPixels();
     int row_length = (ImageWidth * 3 + 3) / 4 * 4;
     for (int iy = 0; iy < ImageHeight; ++iy) {
       byte* row = bits + row_length * iy;
@@ -444,9 +471,6 @@ bool UpdateImage()
         byte red   = *in++;
         byte green = *in++;
         byte blue  = *in++;
-        if (ImageBPP == 32) {
-          ++in;  // skip alpha
-        }
 
         // switch RGB to BGR here...  DIB sections are in BGR
         *row++ = blue;
@@ -455,7 +479,7 @@ bool UpdateImage()
       }
     }
 
-    image->destroy();
+    delete image;
     return true;
 }
 
@@ -528,6 +552,7 @@ void DrawShadedText(HDC dc, int x, int y, const char* text)
 void ResetTimer(HWND window)
 {
     KillTimer(window, TIMER_ID);
+
     if (Timer == 0) {
         SetTimer(window, TIMER_ID, 1000, NULL);
     } else {
