@@ -21,7 +21,7 @@
 #
 
 #
-# $Id: log_accum.pl,v 1.1 2001-12-11 19:50:49 aegis Exp $
+# $Id: log_accum.pl,v 1.2 2001-12-11 19:53:23 aegis Exp $
 #
 
 require 5.005;		# might work with older perl5
@@ -86,8 +86,8 @@ my $FILE_PREFIX = "#cvs.files";
 #	$MAILADDRS = $meister if $DEBUG;
 #}
 
-$MAILADDRS = 'audiere-commits@lists.sourceforge.net';
-$PROJECT = 'audiere';
+$MAILADDRS = 'pictureshow-commits@lists.sourceforge.net';
+$PROJECT = 'pictureshow';
 
 ############################################################
 #
