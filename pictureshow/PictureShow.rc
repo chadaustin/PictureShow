@@ -1,0 +1,138 @@
+//Microsoft Developer Studio generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE DISCARDABLE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MAIN MENU DISCARDABLE 
+BEGIN
+    POPUP "&Main"
+    BEGIN
+        MENUITEM "Set &Directory...",           ID_MAIN_SETDIRECTORY
+        POPUP "Delay"
+        BEGIN
+            MENUITEM "&None",                       ID_MAIN_DELAY_NONE
+            MENUITEM "&1 s",                        ID_MAIN_DELAY_1S
+            MENUITEM "&2 s",                        ID_MAIN_DELAY_2S
+            MENUITEM "&5 s",                        ID_MAIN_DELAY_5S
+            MENUITEM "1&0 s",                       ID_MAIN_DELAY_10S
+            MENUITEM "&Other...",                   ID_MAIN_DELAY_OTHER
+        END
+        POPUP "D&isplay"
+        BEGIN
+            MENUITEM "&Original Size",              ID_MAIN_DISPLAY_ORIGINALSIZE
+
+            MENUITEM "&Stretched",                  ID_MAIN_DISPLAY_STRETCHED
+
+        END
+        POPUP "&Options"
+        BEGIN
+            MENUITEM "&Random",                     ID_MAIN_OPTIONS_RANDOM
+            MENUITEM "&Recurse Subdirectories",     ID_MAIN_OPTIONS_RECURSESUBDIRECTORIES
+
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&About...",                   ID_MAIN_ABOUT
+        MENUITEM "&Exit",                       ID_MAIN_EXIT
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_GETDELAY DIALOG DISCARDABLE  0, 0, 186, 45
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Other Delay"
+FONT 8, "MS Sans Serif"
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,129,7,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,129,24,50,14
+    LTEXT           "Delay (ms)",IDC_STATIC,4,4,34,8
+    EDITTEXT        IDC_DELAY,4,20,52,14,ES_AUTOHSCROLL | ES_NUMBER
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO DISCARDABLE 
+BEGIN
+    IDD_GETDELAY, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 179
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 38
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
