@@ -1,14 +1,13 @@
+#include <memory>
+#include <string>
 #include <stdio.h>
 #include <stdlib.h>
-#include <FreeImage.h>
-#include "WindowProc.hpp"
-#include "Main.hpp"
+#include <corona.h>
+#include "FolderDialog.hpp"
 #include "GetDelayDialog.hpp"
+#include "WindowProc.hpp"
+#include "strcmp_ci.hpp"
 #include "resource.h"
-#include "menu.h"
-#include "folderdialog.h"
-#include "types.h"
-#include "x++.hpp"
 
 
 #define TIMER_ID 900
@@ -16,9 +15,11 @@
 
 struct StringNode
 {
-    char*       str;
+    std::string str;
     StringNode* next;
 };
+
+typedef unsigned char byte;
 
 
 enum DM { DM_ORIGINALSIZE, DM_STRETCHED };
@@ -61,7 +62,7 @@ LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM
         case WM_CREATE: {
             ImageDC = CreateCompatibleDC(NULL);
 
-            SetTimer(window, TIMER_ID, Timer, NULL);
+            SetTimer(window, TIMER_ID, 15, NULL);
             return 0;
         }
 
@@ -78,31 +79,31 @@ LRESULT CALLBACK MainWindowProc(HWND window, UINT message, WPARAM wparam, LPARAM
         ////////////////////////////////////////////////////////////////////////
 
         case WM_RBUTTONUP: {
-            HMENU menu = LoadMenu(MainInstance, MAKEINTRESOURCE(IDR_MAIN));
+            HMENU menu = LoadMenu(GetModuleHandle(0), MAKEINTRESOURCE(IDR_MAIN));
             HMENU sub_menu = GetSubMenu(menu, 0);
 
             // update the menu
             switch (Timer) {
-                case 0:     SetMenuCheck(menu, ID_MAIN_DELAY_NONE,  TRUE); break;
-                case 1000:  SetMenuCheck(menu, ID_MAIN_DELAY_1S,    TRUE); break;
-                case 2000:  SetMenuCheck(menu, ID_MAIN_DELAY_2S,    TRUE); break;
-                case 5000:  SetMenuCheck(menu, ID_MAIN_DELAY_5S,    TRUE); break;
-                case 10000: SetMenuCheck(menu, ID_MAIN_DELAY_10S,   TRUE); break;
-                default:    SetMenuCheck(menu, ID_MAIN_DELAY_OTHER, TRUE); break;
+                case 0:     CheckMenuItem(menu, ID_MAIN_DELAY_NONE,  BST_CHECKED); break;
+                case 1000:  CheckMenuItem(menu, ID_MAIN_DELAY_1S,    BST_CHECKED); break;
+                case 2000:  CheckMenuItem(menu, ID_MAIN_DELAY_2S,    BST_CHECKED); break;
+                case 5000:  CheckMenuItem(menu, ID_MAIN_DELAY_5S,    BST_CHECKED); break;
+                case 10000: CheckMenuItem(menu, ID_MAIN_DELAY_10S,   BST_CHECKED); break;
+                default:    CheckMenuItem(menu, ID_MAIN_DELAY_OTHER, BST_CHECKED); break;
             }
 
             if (DisplayMode == DM_ORIGINALSIZE) {
-                SetMenuCheck(menu, ID_MAIN_DISPLAY_ORIGINALSIZE, TRUE);
+                CheckMenuItem(menu, ID_MAIN_DISPLAY_ORIGINALSIZE, BST_CHECKED);
             } else {
-                SetMenuCheck(menu, ID_MAIN_DISPLAY_STRETCHED, TRUE);
+                CheckMenuItem(menu, ID_MAIN_DISPLAY_STRETCHED, BST_CHECKED);
             }
 
             if (Random) {
-                SetMenuCheck(menu, ID_MAIN_OPTIONS_RANDOM, TRUE);
+                CheckMenuItem(menu, ID_MAIN_OPTIONS_RANDOM, BST_CHECKED);
             }
 
             if (RecurseSubdirectories) {
-                SetMenuCheck(menu, ID_MAIN_OPTIONS_RECURSESUBDIRECTORIES, TRUE);
+                CheckMenuItem(menu, ID_MAIN_OPTIONS_RECURSESUBDIRECTORIES, BST_CHECKED);
             }
 
             POINT cursor;
@@ -325,14 +326,20 @@ static bool IsPNG(const char* filename)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static bool IsPCX(const char* filename)
+{
+    return (strlen(filename) > 4 && strcmp_ci(filename + strlen(filename) - 4, ".pcx") == 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 bool DestroyImageList()
 {
     StringNode* node = ImageList;
     while (node) {
         StringNode* p = node;
         node = node->next;
-        delete[] p->str;
-        delete   p;
+        delete p;
     }
     ImageList = NULL;
     ImageListSize = 0;
@@ -351,7 +358,9 @@ bool CreateImageList(const char* _directory)
 
     char old_directory[MAX_PATH];
     GetCurrentDirectory(MAX_PATH, old_directory);
-    SetCurrentDirectory(directory);
+    if (!SetCurrentDirectory(directory)) {
+      return false;
+    }
 
     WIN32_FIND_DATA ffd;
     HANDLE handle = FindFirstFile("*", &ffd);
@@ -374,7 +383,8 @@ bool CreateImageList(const char* _directory)
         // if the file is a JPEG or PNG, add it to the list
         } else {
             if (strlen(ffd.cFileName) > 4) {
-                if (IsJPEG(ffd.cFileName) || IsPNG(ffd.cFileName)) {
+//                if (IsJPEG(ffd.cFileName) || IsPNG(ffd.cFileName)) {
+                if (IsPCX(ffd.cFileName)) {
 
                     char path[MAX_PATH];
                     sprintf(path, "%s\\%s", directory, ffd.cFileName);
@@ -402,7 +412,7 @@ const char* GetImage(int index)
     while (index--) {
         node = node->next;
     }
-    return node->str;
+    return node->str.c_str();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -410,7 +420,7 @@ const char* GetImage(int index)
 void AddImage(const char* image)
 {
     StringNode* n = new StringNode;
-    n->str = newstr(image);
+    n->str = image;
     n->next = NULL;
 
     if (ImageList == NULL) {
@@ -448,32 +458,51 @@ bool UpdateImage()
 
     // load the image
     const char* filename = GetImage(CurrentImage);
-
-    void* dib = NULL;
-    if (IsJPEG(filename)) {
-        dib = FI_LoadJPEG(filename, JPEG_ACCURATE);
-    } else if (IsPNG(filename)) {
-        dib = FI_LoadPNG(filename, PNG_DEFAULT);
-    }
-    if (dib == NULL) {
+    corona::Image* image = corona::OpenImage(filename);
+    if (!image) {
         return false;
     }
 
     // get image dimensions
-    ImageWidth   = FI_GetWidth(dib);
-    ImageHeight  = FI_GetHeight(dib);
-    int ImageBPP = FI_GetBPP(dib);
+    ImageWidth   = image->getWidth();
+    ImageHeight  = image->getHeight();
+    int ImageBPP = image->getFormat() == corona::R8G8B8 ? 24 : 32;
+
+    BITMAPINFO bmi;
+    memset(&bmi, 0, sizeof(bmi));
+    BITMAPINFOHEADER& bmih = bmi.bmiHeader;
+    bmih.biSize     = sizeof(bmih);
+    bmih.biWidth    = ImageWidth;
+    bmih.biHeight   = -ImageHeight;
+    bmih.biPlanes   = 1;
+    bmih.biBitCount = 24;
     
     // create a new DIB section based on the image
     byte* bits;
-    ImageBitmap = CreateDIBSection(ImageDC, FI_GetInfo(dib), DIB_RGB_COLORS, (void**)&bits, NULL, 0);
-    memcpy(bits, FI_GetBits(dib), ImageWidth * ImageHeight * ImageBPP / 8);
+    ImageBitmap = CreateDIBSection(ImageDC, &bmi, DIB_RGB_COLORS, (void**)&bits, NULL, 0);
 
-    FI_Unload(dib);
+    byte* in = (unsigned char*)image->getPixels();
+    int row_length = (ImageWidth * 3 + 3) / 4 * 4;
+    for (int iy = 0; iy < ImageHeight; ++iy) {
+      byte* row = bits + row_length * iy;
+      for (int ix = 0; ix < ImageWidth; ++ix) {
+        byte red   = *in++;
+        byte green = *in++;
+        byte blue  = *in++;
+        if (ImageBPP == 32) {
+          ++in;  // skip alpha
+        }
 
+        // switch RGB to BGR here...  DIB sections are in BGR
+        *row++ = blue;
+        *row++ = green;
+        *row++ = red;
+      }
+    }
 
     SelectObject(ImageDC, ImageBitmap);
 
+    image->destroy();
     return true;
 }
 
@@ -547,9 +576,9 @@ void ResetTimer(HWND window)
 {
     KillTimer(window, TIMER_ID);
     if (Timer == 0) {
-        SetTimer(window, TIMER_ID, 1000, NULL);
+        SetTimer(window, TIMER_ID, 15, NULL);
     } else {
-        SetTimer(window, TIMER_ID, Timer, NULL);
+        SetTimer(window, TIMER_ID, 15, NULL);
     }
 }
 

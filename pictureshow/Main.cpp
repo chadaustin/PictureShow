@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <time.h>
-#include "Main.hpp"
 #include "WindowProc.hpp"
 
 

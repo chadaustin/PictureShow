@@ -1,5 +1,4 @@
 #include "GetDelayDialog.hpp"
-#include "Main.hpp"
 #include "resource.h"
 
 
@@ -13,7 +12,7 @@ static int Delay;
 
 int GetDelayDialog(HWND parent)
 {
-    DialogBox(MainInstance, MAKEINTRESOURCE(IDD_GETDELAY), parent, DialogProc);
+    DialogBox(GetModuleHandle(0), MAKEINTRESOURCE(IDD_GETDELAY), parent, DialogProc);
     return Delay;
 }
 

@@ -40,6 +40,7 @@ RSC=rc.exe
 # PROP Use_Debug_Libraries 0
 # PROP Output_Dir "Release"
 # PROP Intermediate_Dir "Release"
+# PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_MBCS" /YX /FD /c
 # ADD CPP /nologo /W3 /GX /O2 /I "d:\FreeImage" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /D "_MBCS" /D "WIN32_LEAN_AND_MEAN" /D "STRICT" /YX /FD /c
@@ -52,7 +53,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /machine:I386
-# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /machine:I386
+# ADD LINK32 corona.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /machine:I386
 
 !ELSEIF  "$(CFG)" == "PictureShow - Win32 Debug"
 
@@ -65,6 +66,7 @@ LINK32=link.exe
 # PROP Use_Debug_Libraries 1
 # PROP Output_Dir "Debug"
 # PROP Intermediate_Dir "Debug"
+# PROP Ignore_Export_Lib 0
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_MBCS" /YX /FD /GZ /c
 # ADD CPP /nologo /W3 /Gm /GX /ZI /Od /I "d:\FreeImage" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "_MBCS" /D "WIN32_LEAN_AND_MEAN" /D "STRICT" /YX /FD /GZ /c
@@ -77,7 +79,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /debug /machine:I386 /pdbtype:sept
-# ADD LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /debug /machine:I386 /pdbtype:sept
+# ADD LINK32 corona.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /debug /machine:I386 /pdbtype:sept
 
 !ENDIF 
 
@@ -88,6 +90,10 @@ LINK32=link.exe
 # Begin Group "Source Files"
 
 # PROP Default_Filter "cpp;c;cxx;rc;def;r;odl;idl;hpj;bat"
+# Begin Source File
+
+SOURCE=.\FolderDialog.cpp
+# End Source File
 # Begin Source File
 
 SOURCE=.\GetDelayDialog.cpp
@@ -106,11 +112,11 @@ SOURCE=.\WindowProc.cpp
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=.\GetDelayDialog.hpp
+SOURCE=.\FolderDialog.hpp
 # End Source File
 # Begin Source File
 
-SOURCE=.\Main.hpp
+SOURCE=.\GetDelayDialog.hpp
 # End Source File
 # Begin Source File
 
@@ -127,78 +133,6 @@ SOURCE=.\PictureShow.rc
 # Begin Source File
 
 SOURCE=.\resource.h
-# End Source File
-# End Group
-# Begin Group "Library Files"
-
-# PROP Default_Filter ""
-# Begin Source File
-
-SOURCE="..\third-party\FreeImage\FreeImage.h"
-# End Source File
-# Begin Source File
-
-SOURCE="..\third-party\FreeImage\FreeImage.lib"
-# End Source File
-# End Group
-# Begin Group "Common"
-
-# PROP Default_Filter ""
-# Begin Source File
-
-SOURCE=..\..\cvs\common\begin_c_prototypes.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\common\begin_c_prototypes.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\cvs\common\end_c_prototypes.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\common\end_c_prototypes.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\common\folderdialog.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\cvs\common\folderdialog.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\common\folderdialog.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\common\menu.c
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\cvs\common\menu.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\common\menu.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\cvs\common\unicode.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\common\unicode.h
-# End Source File
-# Begin Source File
-
-SOURCE="..\..\cvs\common\x++.hpp"
-# End Source File
-# Begin Source File
-
-SOURCE="..\common\x++.hpp"
 # End Source File
 # End Group
 # Begin Source File
